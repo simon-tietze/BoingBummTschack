@@ -16,6 +16,8 @@ typedef struct {
   float min_velocity;
   byte xtalk_group;
   unsigned long mask_micros;
+  byte minspeed;
+  
   CircleBuffer values;
   CircleBuffer values_lowp;
   float last_peak;

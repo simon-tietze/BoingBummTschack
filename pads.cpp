@@ -32,13 +32,10 @@ void read_pin(Pad *p) {
   record_value(&p->values, analogRead(p->physical_pin) * p->gain);  
 }
 
-// currently mean, commented out = max
+// currently mean
 void update_lowp(Pad *p) {
   float new_v = 0;
   for(int i = 0; i < p->values.n; i++) {
-    //if(p->values.data[i] > new_v) {
-    //  new_v = p->values.data[i];
-    //}
     new_v += p->values.data[i];
   }
   new_v = new_v / p->values.n;
@@ -46,7 +43,8 @@ void update_lowp(Pad *p) {
 }
 
 float peakify(Pad *p) {
-  if(prev(&p->values_lowp, 1) > prev(&p->values_lowp, 2) & prev(&p->values_lowp, 1) >= current(&p->values_lowp)) {
+  if(prev(&p->values_lowp, 1) - prev(&p->values_lowp, 2) > p->minspeed & // fast enough hit or at least intensity was increasing ( == >0) for most, speed used for pedal hat vs soft hat close)
+     prev(&p->values_lowp, 1) - current(&p->values_lowp) >= -1 * p->minspeed) { // and not increasing anymore or even going down
     return(prev(&p->values_lowp, 1));
   } else {
     return(0.0);

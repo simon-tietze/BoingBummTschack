@@ -7,7 +7,7 @@
 
 const boolean DEBUG = false;
 const byte CHANNEL = 10;                          
-int const N_PADS = 4;
+int const N_PADS = 5;
 int const N_XTALK_GROUPS = 3;
 unsigned long const XTALK_MASK_MICROS = 120000;
 byte const N_LP_SAMPLES = 4;
@@ -17,10 +17,11 @@ const float MAX_SEND_VELOCITY = 127;
 
 
 Pad pads[N_PADS] = {
-  {.physical_pin = 0,.midi_note = 38, .gain = 1.5, .min_velocity = 300.0, .xtalk_group = 0, .mask_micros = 75000}, // Snare (left)
-  {.physical_pin = 1,.midi_note = 46, .gain = 2.0, .min_velocity = 150.0, .xtalk_group = 1, .mask_micros = 75000}, // HiHat (right)
-  {.physical_pin = 2,.midi_note = 51, .gain = 2.0, .min_velocity = 250.0, .xtalk_group = 1, .mask_micros = 75000}, // Crash (right side)
-  {.physical_pin = 3,.midi_note = 36, .gain = 1.0, .min_velocity = 500.0, .xtalk_group = 2, .mask_micros = 250000}, // Bass (mid)
+  {physical_pin : 0, midi_note : 38, gain : 1.5, min_velocity : 300.0, xtalk_group : 0, mask_micros : 75000,  minspeed : 0},  // Snare (left)
+  {physical_pin : 1, midi_note : 46, gain : 2.0, min_velocity : 150.0, xtalk_group : 1, mask_micros : 75000,  minspeed : 0},  // HiHat (right)
+  {physical_pin : 2, midi_note : 51, gain : 2.0, min_velocity : 200.0, xtalk_group : 1, mask_micros : 75000,  minspeed : 0},  // Crash (right side)
+  {physical_pin : 3, midi_note : 36, gain : 1.0, min_velocity : 500.0, xtalk_group : 2, mask_micros : 250000, minspeed : 0},  // Bass (right foot)
+  {physical_pin : 4, midi_note : 44, gain : 1.0, min_velocity : 500.0, xtalk_group : 1, mask_micros : 75000,  minspeed : 5}   // Pedal Hi Hat (left foot)
 }; 
 
 int const HIHAT_PEDAL_PIN = 4;
@@ -79,7 +80,6 @@ void noteOff(byte channel, byte pitch, byte velocity) {
 
 void loop() {
   unsigned long t = micros();
-  int pedal = analogRead(HIHAT_PEDAL_PIN);
   
   if(DEBUG) {
     Serial.print(t);
@@ -93,10 +93,12 @@ void loop() {
   }
   
   for(int p=0; p < N_PADS; p++) {
-    read_pin(&pads[p]);
+    read_pin(&pads[p]); // dummy read to reduce crosstalk
     update_lowp(&pads[p]);
     pads[p].last_peak = peakify(&pads[p]);
   }
+
+  int pedal =  current(&pads[HIHAT_PEDAL_PIN].values);
 
   // sort pads in descending order to hit strongest peak first
   // in case of xtalk
@@ -137,8 +139,16 @@ void loop() {
       // neither strong nor hodling, send -127 for debug
       v = -127;
     }
-    
-    
+    if(false){
+    if(p == 4) {
+          Serial.print(prev(&pads[p].values_lowp, 1) - prev(&pads[p].values_lowp, 2));
+          Serial.print("\t");
+          Serial.print(prev(&pads[p].values_lowp, 1) - current(&pads[p].values_lowp));
+          Serial.print("\t");
+          Serial.print(pads[p].last_peak);
+          Serial.println();
+        }
+    }
     if(DEBUG) {
       Serial.print(current(&pads[p].values));
       Serial.print(",");
@@ -156,7 +166,9 @@ void loop() {
       if(v > 0) {
         //Serial.print(p);
         //Serial.println(" on");
-        noteOn(CHANNEL, (pads[p].midi_note == 46) & (pedal > 512) ? 42 : pads[p].midi_note, (byte) v);
+        
+        byte midi_note = (pads[p].midi_note == 46) & (pedal > 512) ? 42 : pads[p].midi_note;
+        noteOn(CHANNEL, midi_note, (byte) v);
       } else if(v == 0) {
         //Serial.print(p);
         //Serial.println(" off");
